@@ -1,6 +1,3 @@
-# Install required packages
-!pip install streamlit pyngrok joblib prophet plotly fpdf --quiet
-
 # ==================== APP CODE ====================
 app_code = """
 import streamlit as st
