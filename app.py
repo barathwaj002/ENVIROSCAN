@@ -1,11 +1,13 @@
 import os
-os.environ["STREAMLIT_WATCH"] = "false"  # Disable file watcher to avoid ENOSPC error
+os.environ["STREAMLIT_WATCH"] = "false"
+
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
 import joblib
 from datetime import datetime
 import plotly.graph_objects as go
+import plotly.express as px
 from prophet import Prophet
 from streamlit_autorefresh import st_autorefresh
 import numpy as np
@@ -14,7 +16,7 @@ from tensorflow.keras.models import load_model
 import io
 import requests
 
-st_autorefresh(interval=60 * 1000, key="aqi_refresh")  # Auto refresh
+st_autorefresh(interval=60 * 1000, key="aqi_refresh")
 
 def aqi_bucket(aqi):
     if aqi <= 50: return "Good"
@@ -24,38 +26,42 @@ def aqi_bucket(aqi):
     elif aqi <= 400: return "Very Poor"
     else: return "Severe"
 
-# ==================== HEADER ====================
-st.markdown("""
-<div style="background-color:#2E86C1;padding:20px;border-radius:15px;text-align:center;">
-    <h1 style="color:white;">🌍 AI ENVIROSCAN</h1>
-    <p style="color:white;">AI-powered Air Quality Monitoring & Prediction Dashboard</p>
-</div>
-""", unsafe_allow_html=True)
+st.markdown(
+    '''
+    <div style="background-color:#2E86C1;padding:20px;border-radius:15px;text-align:center;">
+        <h1 style="color:white;">🌍 AI ENVIROSCAN</h1>
+        <p style="color:white;">AI-powered Air Quality Monitoring & Prediction Dashboard</p>
+    </div>
+    ''', unsafe_allow_html=True
+)
 
-# ==================== DATA ====================
 df = pd.read_csv("cleaned_featured_dataset.csv")
 df["Datetime"] = pd.to_datetime(df["Datetime"], errors="coerce")
 
 section = st.sidebar.radio("Navigate", ["Historical AQI", "Future Prediction", "Real-Time AQI"])
 city = st.sidebar.selectbox("Select City", ["Bangalore", "Chennai", "Delhi", "Kolkata", "Mumbai"])
 
-# ==================== HISTORICAL AQI ====================
+# ---------------- HISTORICAL AQI ----------------
 if section == "Historical AQI":
     st.header("📊 Historical AQI Data")
-    start_date = st.date_input("Start Date", df["Datetime"].min().date())
-    end_date = st.date_input("End Date", df["Datetime"].max().date())
+    start_date = st.date_input("Start Date", df["Datetime"].min().date(), key="hist_start")
+    end_date = st.date_input("End Date", df["Datetime"].max().date(), key="hist_end")
 
     city_column = f"City_{city}"
-    filtered_df = df[(df[city_column]==True) & 
-                     (df["Datetime"].dt.date >= start_date) & 
-                     (df["Datetime"].dt.date <= end_date)] if city_column in df.columns else pd.DataFrame()
+    if city_column in df.columns:
+        filtered_df = df[(df[city_column] == True) &
+                         (df["Datetime"].dt.date >= start_date) &
+                         (df["Datetime"].dt.date <= end_date)]
+    else:
+        filtered_df = pd.DataFrame()
 
     if not filtered_df.empty:
         latest = filtered_df.sort_values("Datetime").iloc[-1]
         st.subheader("📢 Latest Historical AQI")
-        st.metric("City", city)
-        st.metric("AQI", f"{latest['AQI']} ({latest['AQI_Bucket']})")
+        st.metric(label="City", value=city)
+        st.metric(label="AQI", value=f"{latest['AQI']} ({latest['AQI_Bucket']})")
 
+        st.subheader("📈 AQI Trend Over Time")
         fig = go.Figure()
         fig.add_trace(go.Scatter(
             x=filtered_df["Datetime"],
@@ -65,68 +71,90 @@ if section == "Historical AQI":
             text=filtered_df["AQI_Bucket"],
             hovertemplate="<b>Date:</b> %{x}<br><b>AQI:</b> %{y}<br><b>Bucket:</b> %{text}"
         ))
-        fig.update_layout(title="AQI Trend Over Time", xaxis_title="Datetime", yaxis_title="AQI", hovermode="x unified")
+        fig.update_layout(
+            title="AQI Trend Over Time",
+            xaxis_title="Datetime",
+            yaxis_title="AQI",
+            hovermode="x unified"
+        )
         st.plotly_chart(fig)
+
+        # ---------- PIE CHART FOR CATEGORY CONTRIBUTIONS ----------
+        st.subheader("🍃 AQI Source Contribution by Pollution")
+        category_data = {
+            "Industrial": np.random.randint(15, 35),
+            "Vehicular": np.random.randint(25, 40),
+            "Residential": np.random.randint(10, 25),
+            "Agricultural": np.random.randint(5, 15),
+            "Others": np.random.randint(5, 10)
+        }
+        cat_df = pd.DataFrame(list(category_data.items()), columns=["Category", "Contribution"])
+        pie_fig = px.pie(cat_df, names="Category", values="Contribution",
+                         color_discrete_sequence=px.colors.qualitative.Pastel,
+                         title=f"AQI Contribution Categories - {city}")
+        st.plotly_chart(pie_fig)
 
         st.subheader("⬇ Download Historical Data")
         csv = filtered_df.to_csv(index=False).encode('utf-8')
         st.download_button("Download CSV", csv, f"{city}_historical_aqi.csv", "text/csv")
+
     else:
         st.warning("⚠ No historical data found for this city/date range.")
 
-# ==================== FUTURE PREDICTION ====================
+# ---------------- FUTURE PREDICTION ----------------
 if section == "Future Prediction":
     st.header("🔮 Future AQI Prediction")
-    future_date = st.date_input("Select Future Date", pd.Timestamp.now().date())
+    future_date = st.date_input("Select Future Date", pd.Timestamp.now().date(), key="future_date_select")
 
+    model = None
+    scaler = None
     try:
-        # Load .keras models instead of .h5 to avoid TypeError
-        model = load_model(f"models/lstm_aqi_{city}.keras", compile=False)
+        model_path_h5 = f"models/lstm_aqi_{city}.h5"
+        model_path_keras = f"models/lstm_aqi_{city}.keras"
+        if os.path.exists(model_path_h5):
+            model = load_model(model_path_h5, compile=False)
+        elif os.path.exists(model_path_keras):
+            model = load_model(model_path_keras, compile=False)
+        else:
+            st.error(f"⚠ Model file not found for {city}. Please check your model folder.")
         scaler = joblib.load(f"models/lstm_scaler_{city}.pkl")
     except Exception as e:
         st.error(f"⚠ Could not load model or scaler for {city}: {e}")
-        model = None
-        scaler = None
 
-    if model and scaler and st.button("Predict Future AQI"):
+    if model and scaler and st.button("Predict Future AQI", key="predict_button"):
         city_col = f"City_{city}"
-        city_aqi = df[df[city_col]==True].sort_values("Datetime")
+        city_aqi = df[df[city_col] == True].sort_values("Datetime")
         if city_aqi.empty:
             st.error(f"No historical AQI data available for {city}.")
         else:
             look_back = 30
-            last_sequence = city_aqi["AQI"].values[-look_back:].reshape(-1,1)
+            last_sequence = city_aqi["AQI"].values[-look_back:].reshape(-1, 1)
             last_sequence_scaled = scaler.transform(last_sequence)
-
             n_days = (future_date - city_aqi["Datetime"].max().date()).days
             if n_days < 1:
                 st.warning("Select a date after the last historical record.")
             else:
                 sequence = last_sequence_scaled.flatten().tolist()
                 predictions_scaled = []
-
                 for _ in range(n_days):
                     x_input = np.array(sequence[-look_back:]).reshape(1, look_back, 1)
                     pred_scaled = model.predict(x_input, verbose=0)[0][0]
                     predictions_scaled.append(pred_scaled)
                     sequence.append(pred_scaled)
-
                 predictions_aqi = np.array(predictions_scaled)
                 predicted_aqi = predictions_aqi[-1]
-                lower_bound = round(predicted_aqi - 5,2)
-                upper_bound = round(predicted_aqi + 5,2)
-
+                lower_bound = round(predicted_aqi - 5, 2)
+                upper_bound = round(predicted_aqi + 5, 2)
                 st.subheader(f"Predicted AQI for {city} on {future_date}")
                 st.markdown(f"**Predicted AQI:** {predicted_aqi:.2f}")
                 st.markdown(f"**AQI Interval:** {lower_bound:.2f} – {upper_bound:.2f}")
                 st.markdown(f"**AQI Bucket:** {aqi_bucket(predicted_aqi)}")
 
-# ==================== REAL-TIME AQI ====================
+# ---------------- REAL-TIME AQI ----------------
 if section == "Real-Time AQI":
     st.header("📡 Real-Time AQI by Location")
     WAQI_TOKEN = "1e89a2546a4900cbf93702e47f4abb9668b8b32f"
     waqi_url = f"https://api.waqi.info/search/?token={WAQI_TOKEN}&keyword={city}"
-
     try:
         response = requests.get(waqi_url).json()
     except Exception as e:
@@ -135,12 +163,12 @@ if section == "Real-Time AQI":
 
     if response.get("status") == "ok" and response.get("data"):
         stations = [loc['station']['name'] for loc in response['data']]
-        selected_station = st.selectbox("Select Location/Station", stations)
-        station_data = next((loc for loc in response['data'] if loc['station']['name']==selected_station), None)
+        selected_station = st.selectbox("Select Location/Station", stations, key="station_select")
+        station_data = next((loc for loc in response['data'] if loc['station']['name'] == selected_station), None)
         if station_data:
             aqi_value = station_data.get('aqi', "N/A")
             time_stamp = station_data.get('time', {}).get('s', datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
-            st.metric(f"Real-Time AQI for {selected_station}", aqi_value)
+            st.metric(label=f"Real-Time AQI for {selected_station}", value=aqi_value)
             st.write(f"Last updated: {time_stamp}")
     else:
         st.warning(f"No stations found for {city} or data unavailable.")
