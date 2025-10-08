@@ -1,7 +1,5 @@
-# ==================== APP CODE ====================
-app_code = """
 import os
-os.environ["STREAMLIT_WATCH"] = "false"
+os.environ["STREAMLIT_WATCH"] = "false"  # Disable file watcher to avoid ENOSPC error
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -12,9 +10,9 @@ from prophet import Prophet
 from streamlit_autorefresh import st_autorefresh
 import numpy as np
 from fpdf import FPDF
+from tensorflow.keras.models import load_model
 import io
 import requests
-from tensorflow.keras.models import load_model
 
 # Auto refresh every 60 seconds for realtime AQI
 st_autorefresh(interval=60 * 1000, key="aqi_refresh")
@@ -61,8 +59,8 @@ if section == "Historical AQI":
 
     city_column = f"City_{city}"
     if city_column in df.columns:
-        filtered_df = df[(df[city_column]==True) &
-                         (df["Datetime"].dt.date >= start_date) &
+        filtered_df = df[(df[city_column]==True) & 
+                         (df["Datetime"].dt.date >= start_date) & 
                          (df["Datetime"].dt.date <= end_date)]
     else:
         filtered_df = pd.DataFrame()
@@ -91,53 +89,9 @@ if section == "Historical AQI":
         )
         st.plotly_chart(fig)
 
-        st.subheader("🛑 Pollution Source Distribution by Source Category")
-
-        # Map pollutants to source categories
-        pollutant_to_source = {
-            "PM2.5": "Vehicles",
-            "PM10": "Industry",
-            "NO2": "Vehicles",
-            "SO2": "Industry",
-            "CO": "Vehicles",
-            "O3": "Other Sources"
-        }
-
-        pollutant_cols = ["PM2.5", "PM10", "NO2", "SO2", "CO", "O3"]
-        available_pollutants = [col for col in pollutant_cols if col in filtered_df.columns]
-
-        if available_pollutants:
-            latest_pollutants = filtered_df[available_pollutants].iloc[-1]
-
-            source_values = {}
-            for pol, val in latest_pollutants.items():
-                source = pollutant_to_source.get(pol, "Other Sources")
-                source_values[source] = source_values.get(source, 0) + val
-
-            fig = go.Figure(data=[go.Pie(
-                labels=list(source_values.keys()),
-                values=list(source_values.values()),
-                hoverinfo='label+percent+value',
-                textinfo='label+percent'
-            )])
-            fig.update_layout(title="Pollution Source Distribution")
-            st.plotly_chart(fig)
-
         st.subheader("⬇ Download Historical Data")
         csv = filtered_df.to_csv(index=False).encode('utf-8')
         st.download_button("Download CSV", csv, f"{city}_historical_aqi.csv", "text/csv")
-
-        # PDF download
-        pdf_buffer = io.BytesIO()
-        pdf = FPDF()
-        pdf.add_page()
-        pdf.set_font("Arial", size=12)
-        pdf.cell(0, 10, f"{city} Historical AQI ({start_date} to {end_date})", ln=True, align='C')
-        pdf.ln(10)
-        for i, row in filtered_df.iterrows():
-            pdf.multi_cell(0, 8, f"{row['Datetime'].strftime('%Y-%m-%d %H:%M:%S')} | AQI: {row['AQI']} | Bucket: {row['AQI_Bucket']}")
-        pdf_bytes = pdf.output(dest='S').encode('latin-1')
-        st.download_button("Download PDF", pdf_bytes, f"{city}_historical_aqi.pdf", "application/pdf")
 
     else:
         st.warning("⚠ No historical data found for this city/date range.")
@@ -145,10 +99,6 @@ if section == "Historical AQI":
 # ==================== FUTURE PREDICTION ====================
 if section == "Future Prediction":
     st.header("🔮 Future AQI Prediction")
-
-    cities = ["Bangalore", "Chennai", "Delhi", "Kolkata", "Mumbai"]
-    city = st.selectbox("Select a City", cities, key="future_city_select")
-
     future_date = st.date_input(
         "Select Future Date",
         pd.Timestamp.now().date(),
@@ -183,10 +133,6 @@ if section == "Future Prediction":
                 for _ in range(n_days):
                     x_input = np.array(sequence[-look_back:]).reshape(1, look_back, 1)
                     pred_scaled = model.predict(x_input, verbose=0)[0][0]
-                    if city in ["Delhi", "Bangalore"]:
-                        pred_scaled = np.random.uniform(110,120)
-                    else:
-                        pred_scaled = np.random.uniform(70,90)
                     predictions_scaled.append(pred_scaled)
                     sequence.append(pred_scaled)
 
@@ -200,26 +146,10 @@ if section == "Future Prediction":
                 st.markdown(f"**AQI Interval:** {lower_bound:.2f} – {upper_bound:.2f}")
                 st.markdown(f"**AQI Bucket:** {aqi_bucket(predicted_aqi)}")
 
-                pollutant_cols = ["PM2.5","PM10","NO","NO2","NOx","NH3","CO","SO2","O3","Benzene","Toluene","Xylene"]
-                last_pollutants = city_aqi[pollutant_cols].iloc[-1]
-                pollutant_values = {}
-                for pol in pollutant_cols:
-                    pollutant_values[pol] = round(float(last_pollutants[pol]) * np.random.uniform(0.95,1.05),2)
-
-                st.subheader("🌫️ Pollutant Concentrations (µg/m³)")
-                for pol, val in pollutant_values.items():
-                    st.markdown(f"**{pol}:** {val}")
-
 # ==================== REAL-TIME AQI ====================
 if section == "Real-Time AQI":
     st.header("📡 Real-Time AQI by Location")
     WAQI_TOKEN = "1e89a2546a4900cbf93702e47f4abb9668b8b32f"
-    city = st.sidebar.selectbox(
-        "Select City for Real-Time AQI",
-        ["Bangalore", "Chennai", "Delhi", "Kolkata", "Mumbai"],
-        key="city_realtime"
-    )
-
     waqi_url = f"https://api.waqi.info/search/?token={WAQI_TOKEN}&keyword={city}"
     try:
         response = requests.get(waqi_url).json()
@@ -236,24 +166,5 @@ if section == "Real-Time AQI":
             time_stamp = station_data.get('time', {}).get('s', datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
             st.metric(label=f"Real-Time AQI for {selected_station}", value=aqi_value)
             st.write(f"Last updated: {time_stamp}")
-            iaqi = station_data.get("iaqi", {})
-            if iaqi:
-                st.subheader("Pollutants (µg/m³)")
-                for pol, val in iaqi.items():
-                    st.write(f"{pol.upper()}: {val.get('v', 'N/A')}")
     else:
         st.warning(f"No stations found for {city} or data unavailable.")
-"""
-
-# Save app.py
-with open("/content/app.py", "w") as f:
-    f.write(app_code)
-
-# ==================== RUN STREAMLIT WITH NGROK ====================
-from pyngrok import ngrok
-ngrok.kill()
-ngrok.set_auth_token("33BujIvcl3xjfimoafOJBjlhUqt_4So3pcCThTuNqHUC8mZhd")
-import os
-get_ipython().system_raw("streamlit run /content/app.py --server.port 8501 &")
-public_url = ngrok.connect(8501)
-print("🚀 Streamlit is live at:", public_url)
