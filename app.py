@@ -37,7 +37,7 @@ st.markdown(
 )
 
 # ==================== DATA ====================
-df = pd.read_csv("/content/cleaned_featured_dataset.csv")
+df = pd.read_csv("models/cleaned_featured_dataset.csv")
 df["Datetime"] = pd.to_datetime(df["Datetime"], errors="coerce")
 
 # Sidebar Navigation
@@ -154,8 +154,8 @@ if section == "Future Prediction":
     )
 
     try:
-        model = load_model(f"/content/lstm_aqi_{city}.h5", compile=False)
-        scaler = joblib.load(f"/content/lstm_scaler_{city}.pkl")
+        model = load_model(f"models/lstm_aqi_{city}.h5", compile=False)
+        scaler = joblib.load(f"models/lstm_scaler_{city}.pkl")
     except FileNotFoundError:
         st.error(f"⚠ LSTM model or scaler for {city} not found.")
         model = None
