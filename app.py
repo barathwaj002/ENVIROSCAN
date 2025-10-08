@@ -1,5 +1,7 @@
 # ==================== APP CODE ====================
 app_code = """
+import os
+os.environ["STREAMLIT_WATCH"] = "false"
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
