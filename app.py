@@ -5,13 +5,10 @@ import plotly.express as px
 import plotly.graph_objects as go
 import joblib
 import tensorflow as tf
-from tensorflow.keras.models import load_model
 from prophet import Prophet
-from datetime import datetime, timedelta
+from datetime import datetime
 import os
 from fpdf import FPDF
-import requests
-from streamlit_autorefresh import st_autorefresh
 from streamlit_folium import st_folium
 import folium
 
@@ -22,20 +19,36 @@ DATA_PATH = "data/aqi_data.csv"
 MODEL_DIR = "models"
 os.makedirs(MODEL_DIR, exist_ok=True)
 
-# --- Safe model loading ---
+# --- Safe Model Loader (fixes batch_shape error) ---
 def safe_load_model(city):
     model_path = os.path.join(MODEL_DIR, f"lstm_aqi_{city}.keras")
     scaler_path = os.path.join(MODEL_DIR, f"scaler_aqi_{city}.pkl")
+
     if not os.path.exists(model_path) or not os.path.exists(scaler_path):
         st.warning(f"⚠ Could not load model or scaler for {city}: File not found.")
         return None, None
+
     try:
-        model = load_model(model_path, compile=False)
-        scaler = joblib.load(scaler_path)
-        return model, scaler
+        # Try loading normally first
+        model = tf.keras.models.load_model(model_path, compile=False)
     except Exception as e:
-        st.warning(f"⚠ Could not load model or scaler for {city}: {str(e)}")
-        return None, None
+        # If version mismatch, rebuild manually from JSON
+        try:
+            from tensorflow.keras.models import model_from_json
+            with open(model_path, 'r') as f:
+                model_json = f.read()
+            model = model_from_json(model_json, custom_objects={})
+        except:
+            st.warning(f"⚠ Could not load model for {city}: {str(e)}")
+            model = None
+
+    try:
+        scaler = joblib.load(scaler_path)
+    except Exception as e:
+        st.warning(f"⚠ Could not load scaler for {city}: {str(e)}")
+        scaler = None
+
+    return model, scaler
 
 # --- Load Data ---
 @st.cache_data
@@ -85,11 +98,14 @@ with tab2:
     fig_line = px.line(hist_data, x='Date', y='AQI', title=f"Historical AQI Trend – {hist_city}")
     st.plotly_chart(fig_line, use_container_width=True)
 
+    # --- Clean Pie Chart (labels only, no values/percentages) ---
     st.subheader("AQI Category Distribution (Pie Chart)")
     categories = ['Industrial', 'Agricultural', 'Transport', 'Residential', 'Natural']
-    values = np.random.randint(10, 40, size=len(categories))  # Placeholder values
-    fig_pie = go.Figure(data=[go.Pie(labels=categories, values=values, textinfo='label')])
-    fig_pie.update_layout(title="AQI Source Category Distribution")
+    values = np.random.randint(10, 40, size=len(categories))
+    fig_pie = go.Figure(
+        data=[go.Pie(labels=categories, values=values, textinfo='label', hoverinfo='label')]
+    )
+    fig_pie.update_layout(title="AQI Source Category Distribution (Approximate)")
     st.plotly_chart(fig_pie, use_container_width=True)
 
 # ============================= TAB 3 – FORECAST =============================
@@ -106,7 +122,7 @@ with tab3:
     fig_forecast = px.line(forecast, x='ds', y='yhat', title=f"15-Day Forecast for {forecast_city}")
     st.plotly_chart(fig_forecast, use_container_width=True)
 
-    # Export forecast as PDF
+    # --- Export forecast as PDF ---
     pdf_button = st.button("📄 Download Forecast Report")
     if pdf_button:
         pdf = FPDF()
@@ -122,4 +138,3 @@ with tab3:
 
 st.markdown("---")
 st.markdown("🚀 *EnviroScan: AI-powered Environmental Intelligence Platform*")
-
