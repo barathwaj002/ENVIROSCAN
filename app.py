@@ -37,7 +37,7 @@ st.markdown(
 )
 
 # ==================== DATA ====================
-df = pd.read_csv("models/cleaned_featured_dataset.csv")
+df = pd.read_csv("cleaned_featured_dataset.csv")
 df["Datetime"] = pd.to_datetime(df["Datetime"], errors="coerce")
 
 # Sidebar Navigation
