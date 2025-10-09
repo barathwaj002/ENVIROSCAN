@@ -16,8 +16,8 @@ from tensorflow.keras.models import load_model
 # ---------------- CONFIG ----------------
 st.set_page_config(page_title="🌍 AI EnviroScan", layout="wide")
 
-GITHUB_BASE = "https://raw.githubusercontent.com/<your-username>/<your-repo-name>/main/models"
-DATA_URL = "https://raw.githubusercontent.com/<your-username>/<your-repo-name>/main/data/cleaned_featured_dataset.csv"
+GITHUB_BASE = "https://raw.githubusercontent.com/<barathwaj002>/<ENVIROSCAN>/main/models"
+DATA_URL = "https://raw.githubusercontent.com/<barathwaj002>/<ENVIROSCAN>/main/cleaned_featured_dataset.csv"
 
 # ---------------- AQI BUCKET FUNCTION ----------------
 def aqi_bucket(aqi):
