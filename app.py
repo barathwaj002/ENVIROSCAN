@@ -112,7 +112,7 @@ if section == "Future Prediction":
         st.success(f"✅ Model for {city} loaded successfully from GitHub.")
 
     except Exception as e:
-        st.error(f"❌ Could not load model or scaler for {city}: {e}")
+        st.error(f"❌ Hi Could not load model or scaler for {city}: {e}")
         model = None
         scaler = None
 
