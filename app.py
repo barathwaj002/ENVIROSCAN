@@ -87,17 +87,20 @@ if section == "Historical AQI":
 # ======================================================
 # 🔮 FUTURE PREDICTION (LSTM MODEL)
 # ======================================================
+# ======================================================
+# 🔮 FUTURE PREDICTION (LSTM MODEL)
+# ======================================================
 if section == "Future Prediction":
     st.header("🔮 Future AQI Prediction")
 
     future_date = st.date_input("Select Future Date", pd.Timestamp.now().date(), key="future_date")
 
-    keras_url = f"{GITHUB_BASE}/lstm_aqi_{city}.keras"
-    scaler_url = f"{GITHUB_BASE}/scaler_aqi_{city}.pkl"
+    keras_url = f"{GITHUB_BASE}/lstm_aqi_{city}.h5"  # <- changed to .h5
+    scaler_url = f"{GITHUB_BASE}/lstm_scaler_{city}.pkl"
 
     try:
-        # Download .keras model temporarily
-        keras_temp = tempfile.NamedTemporaryFile(delete=False, suffix=".keras")
+        # Download .h5 model temporarily
+        keras_temp = tempfile.NamedTemporaryFile(delete=False, suffix=".h5")
         keras_temp.write(requests.get(keras_url).content)
         keras_temp.close()
 
@@ -106,7 +109,7 @@ if section == "Future Prediction":
         scaler_temp.write(requests.get(scaler_url).content)
         scaler_temp.close()
 
-        model = tf.keras.models.load_model(keras_temp.name, compile=False)
+        model = load_model(keras_temp.name, compile=False)  # <- load .h5
         scaler = joblib.load(scaler_temp.name)
         st.success(f"✅ Model for {city} loaded successfully from GitHub.")
 
