@@ -87,30 +87,28 @@ if section == "Historical AQI":
 # ======================================================
 # 🔮 FUTURE PREDICTION (LSTM MODEL)
 # ======================================================
-# ======================================================
-# 🔮 FUTURE PREDICTION (LSTM MODEL)
-# ======================================================
 if section == "Future Prediction":
     st.header("🔮 Future AQI Prediction")
 
     future_date = st.date_input("Select Future Date", pd.Timestamp.now().date(), key="future_date")
 
-    keras_url = f"{GITHUB_BASE}/lstm_aqi_{city}.h5"  # <- changed to .h5
+    # Updated to load proper .keras files
+    keras_url = f"{GITHUB_BASE}/lstm_aqi_{city}.keras"
     scaler_url = f"{GITHUB_BASE}/lstm_scaler_{city}.pkl"
 
     try:
-        # Download .h5 model temporarily
-        keras_temp = tempfile.NamedTemporaryFile(delete=False, suffix=".h5")
-        keras_temp.write(requests.get(keras_url).content)
-        keras_temp.close()
+        # Download the .keras model directly from GitHub
+        model_path = tempfile.NamedTemporaryFile(delete=False, suffix=".keras")
+        model_path.write(requests.get(keras_url).content)
+        model_path.close()
 
-        # Download scaler
-        scaler_temp = tempfile.NamedTemporaryFile(delete=False, suffix=".pkl")
-        scaler_temp.write(requests.get(scaler_url).content)
-        scaler_temp.close()
+        scaler_path = tempfile.NamedTemporaryFile(delete=False, suffix=".pkl")
+        scaler_path.write(requests.get(scaler_url).content)
+        scaler_path.close()
 
-        model = load_model(keras_temp.name, compile=False)  # <- load .h5
-        scaler = joblib.load(scaler_temp.name)
+        model = tf.keras.models.load_model(model_path.name, compile=False)
+        scaler = joblib.load(scaler_path.name)
+
         st.success(f"✅ Model for {city} loaded successfully from GitHub.")
 
     except Exception as e:
