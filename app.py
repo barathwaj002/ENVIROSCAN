@@ -121,11 +121,11 @@ if section == "Dashboard":
 
     with tab2:
         st.subheader("🧪 Source Contribution")
-       # inside your Dashboard or wherever you draw the pie chart
-       pollutant_cols = ["PM2.5", "PM10", "NO2", "SO2", "CO", "O3"]
-       # filtered_df is the city’s data
-       available = [c for c in pollutant_cols if c in filtered_df.columns]
-       if available and not filtered_df.empty:
+        # inside your Dashboard or wherever you draw the pie chart
+        pollutant_cols = ["PM2.5", "PM10", "NO2", "SO2", "CO", "O3"]
+        # filtered_df is the city’s data
+        available = [c for c in pollutant_cols if c in filtered_df.columns]
+        if available and not filtered_df.empty:
            # compute mean or sum or latest pollutant values
            mean_vals = filtered_df[available].mean()
            # dynamically map sources
@@ -143,7 +143,7 @@ if section == "Dashboard":
             ))
            pie_fig.update_layout(template="plotly_dark", title="Source Contribution (%)")
            st.plotly_chart(pie_fig, use_container_width=True)
-       else:
+        else:
            st.info("No pollutant data for this city.")
 
 # ======================================================
