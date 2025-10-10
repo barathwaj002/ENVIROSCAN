@@ -133,8 +133,8 @@ if section == "Dashboard":
                  agricultural = mean_vals.get("PM10", 0) * 0.6
                  others = mean_vals.get("PM2.5", 0) * 0.4
 
-                total = industrial + vehicular + agricultural + others
-                if total == 0: total = 1  # prevent division by zero
+                 total = industrial + vehicular + agricultural + others
+                 if total == 0: total = 1  # prevent division by zero
 
                         source_contrib = {
                         "Industrial": round((industrial / total) * 100, 2),
