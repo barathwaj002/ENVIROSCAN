@@ -67,7 +67,8 @@ if df.empty:
 ist_now = datetime.now(ZoneInfo("Asia/Kolkata"))
 ist_formatted = ist_now.strftime("%I:%M:%S %p, %d %b %Y")
 
-st.sidebar.image("https://cdn-icons-png.flaticon.com/512/69/69524.png", width=90)
+# 🌍 Earth/Globe icon
+st.sidebar.image("https://cdn-icons-png.flaticon.com/512/616/616554.png", width=90)
 st.sidebar.title("🌿 Navigation")
 section = st.sidebar.radio("Select Section", ["Dashboard", "Future Prediction", "Real-Time AQI", "About"])
 city = st.sidebar.selectbox("Select City", ["Bangalore", "Chennai", "Delhi", "Kolkata", "Mumbai"])
@@ -84,51 +85,51 @@ if section == "Dashboard":
         city_column = f"City_{city}"
         filtered_df = df[df.get(city_column, False) == True].sort_values("Datetime") if city_column in df.columns else pd.DataFrame()
 
+        # Date range selection for historical AQI
+        col1, col2 = st.columns(2)
+        with col1:
+            start_date = st.date_input("Start Date", pd.Timestamp.now().date() - pd.Timedelta(days=7))
+        with col2:
+            end_date = st.date_input("End Date", pd.Timestamp.now().date())
+        
         if not filtered_df.empty:
-            # ===== USER-SELECTED DATE RANGE =====
-            min_date = filtered_df["Datetime"].min().date()
-            max_date = filtered_df["Datetime"].max().date()
-            start_date, end_date = st.date_input("Select Date Range", [min_date, max_date], key="date_range")
-
             filtered_df = filtered_df[(filtered_df["Datetime"].dt.date >= start_date) &
                                       (filtered_df["Datetime"].dt.date <= end_date)]
+        
+        if not filtered_df.empty:
+            latest = filtered_df.iloc[-1]
+            col1, col2, col3 = st.columns(3)
+            col1.metric("AQI", f"{int(latest['AQI'])}", aqi_bucket(latest['AQI']))
+            col2.metric("Temperature (°C)", round(np.random.uniform(25, 35), 2), "+1°C")
+            col3.metric("Humidity (%)", round(np.random.uniform(45, 75), 2), "-2%")
 
-            if filtered_df.empty:
-                st.warning("No data available for the selected date range.")
-            else:
-                latest = filtered_df.iloc[-1]
-                col1, col2, col3 = st.columns(3)
-                col1.metric("AQI", f"{int(latest['AQI'])}", aqi_bucket(latest['AQI']))
-                col2.metric("Temperature (°C)", round(np.random.uniform(25, 35), 2), "+1°C")
-                col3.metric("Humidity (%)", round(np.random.uniform(45, 75), 2), "-2%")
+            gauge = go.Figure(go.Indicator(
+                mode="gauge+number",
+                value=float(latest['AQI']),
+                title={'text': f"{city} AQI"},
+                gauge={
+                    'axis': {'range': [None, 500]},
+                    'bar': {'color': "#00BFA6"},
+                    'steps': [
+                        {'range': [0, 50], 'color': "#00E676"},
+                        {'range': [50, 100], 'color': "#CDDC39"},
+                        {'range': [100, 200], 'color': "#FFEB3B"},
+                        {'range': [200, 300], 'color': "#FF9800"},
+                        {'range': [300, 400], 'color': "#F44336"},
+                        {'range': [400, 500], 'color': "#B71C1C"}
+                    ],
+                }))
+            gauge.update_layout(height=250, margin=dict(t=0, b=0), template="plotly_dark")
+            st.plotly_chart(gauge, use_container_width=True)
 
-                gauge = go.Figure(go.Indicator(
-                    mode="gauge+number",
-                    value=float(latest['AQI']),
-                    title={'text': f"{city} AQI"},
-                    gauge={
-                        'axis': {'range': [None, 500]},
-                        'bar': {'color': "#00BFA6"},
-                        'steps': [
-                            {'range': [0, 50], 'color': "#00E676"},
-                            {'range': [50, 100], 'color': "#CDDC39"},
-                            {'range': [100, 200], 'color': "#FFEB3B"},
-                            {'range': [200, 300], 'color': "#FF9800"},
-                            {'range': [300, 400], 'color': "#F44336"},
-                            {'range': [400, 500], 'color': "#B71C1C"}
-                        ],
-                    }))
-                gauge.update_layout(height=250, margin=dict(t=0, b=0), template="plotly_dark")
-                st.plotly_chart(gauge, use_container_width=True)
-
-                fig = go.Figure()
-                fig.add_trace(go.Scatter(
-                    x=filtered_df["Datetime"], y=filtered_df["AQI"],
-                    mode='lines+markers', line=dict(color="#14FFEC"), name='AQI'
-                ))
-                fig.update_layout(template="plotly_dark", title=f"AQI Trend – {city}",
-                                  xaxis_title="Datetime", yaxis_title="AQI")
-                st.plotly_chart(fig, use_container_width=True)
+            fig = go.Figure()
+            fig.add_trace(go.Scatter(
+                x=filtered_df["Datetime"], y=filtered_df["AQI"],
+                mode='lines+markers', line=dict(color="#14FFEC"), name='AQI'
+            ))
+            fig.update_layout(template="plotly_dark", title=f"AQI Trend – {city}",
+                              xaxis_title="Datetime", yaxis_title="AQI")
+            st.plotly_chart(fig, use_container_width=True)
 
     with tab2:
         st.subheader("🧪 Source Contribution")
@@ -144,7 +145,7 @@ if section == "Dashboard":
             others = mean_vals.get("PM2.5", 0) * 0.4
 
             total = industrial + vehicular + agricultural + others
-            if total == 0: total = 1
+            if total == 0: total = 1  # prevent division by zero
 
             source_contrib = {
                 "Industrial": round((industrial / total) * 100, 2),
@@ -159,7 +160,7 @@ if section == "Dashboard":
                 hole=0.4,
                 textinfo="label+percent",
                 marker=dict(colors=["#FF6F61", "#6B5B95", "#88B04B", "#FFA500"])
-            ))
+            ))  
             pie_fig.update_layout(template="plotly_dark", title="Source Contribution (%)")
             st.plotly_chart(pie_fig, use_container_width=True)
         else:
@@ -171,7 +172,7 @@ if section == "Dashboard":
 if section == "Future Prediction":
     st.header("🔮 Future AQI Prediction")
     future_date = st.date_input("Select Future Date", pd.Timestamp.now().date(), key="future_date")
-
+    
     keras_url = f"{GITHUB_BASE}/lstm_aqi_{city}.keras"
     scaler_url = f"{GITHUB_BASE}/lstm_scaler_{city}.pkl"
 
@@ -292,5 +293,5 @@ management both accessible and actionable.
 # ======================= FOOTER =======================
 st.markdown("<hr>", unsafe_allow_html=True)
 st.markdown(
-    "<center><small>💡 Developed by <b>AI ENVIROSCAN Team</b> |<b> Barathwaj S </b></small></center>",
+    "<center><small>💡 Developed by <b>AI ENVIROSCAN Team</b> |<b>Barathwaj S</b></small></center>",
     unsafe_allow_html=True)
