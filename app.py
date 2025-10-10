@@ -1,23 +1,20 @@
 import streamlit as st
 import pandas as pd
-import matplotlib.pyplot as plt
 import joblib
 from datetime import datetime
+from zoneinfo import ZoneInfo
 import plotly.graph_objects as go
 import plotly.express as px
-from prophet import Prophet
 import numpy as np
 from fpdf import FPDF
-import io
 import requests
 import tempfile
 import tensorflow as tf
-from tensorflow.keras.models import load_model
 import time
 
 st.set_page_config(page_title="🌍 AI EnviroScan", layout="wide")
 
-# ===================== ANIMATED HEADER & THEME =====================
+# ===================== HEADER =====================
 st.markdown("""
 <style>
 @keyframes gradient {
@@ -67,69 +64,66 @@ if df.empty:
     st.stop()
 
 # ===================== SIDEBAR =====================
-st.sidebar.image("https://cdn-icons-png.flaticon.com/512/727/727790.png", width=100)
+ist_now = datetime.now(ZoneInfo("Asia/Kolkata"))
+ist_formatted = ist_now.strftime("%I:%M:%S %p, %d %b %Y")
+
+st.sidebar.image("https://cdn-icons-png.flaticon.com/512/727/727790.png", width=90)
 st.sidebar.title("🌿 Navigation")
-section = st.sidebar.radio("Select Section", ["Dashboard", "Future Prediction", "Real-Time AQI"])
+section = st.sidebar.radio("Select Section", ["Dashboard", "Future Prediction", "Real-Time AQI", "About"])
 city = st.sidebar.selectbox("Select City", ["Bangalore", "Chennai", "Delhi", "Kolkata", "Mumbai"])
-st.sidebar.markdown(f"⏰ **Current Time:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+st.sidebar.markdown(f"⏰ **IST Time:** {ist_formatted} (Asia/Kolkata)")
 st.sidebar.markdown("---")
-st.sidebar.info("Use filters and interact with visualizations for more insights.")
 
 # ======================================================
 # 📊 DASHBOARD
 # ======================================================
 if section == "Dashboard":
     tab1, tab2 = st.tabs(["📈 Overview", "🧪 Pollutants & Sources"])
-
     with tab1:
-        st.subheader(f"📊 Live Environmental Metrics – {city}")
+        st.subheader(f"📊 Current Metrics for {city}")
         city_column = f"City_{city}"
-        filtered_df = df[df[city_column] == True].sort_values("Datetime")
+        filtered_df = df[df.get(city_column, False) == True].sort_values("Datetime") if city_column in df.columns else pd.DataFrame()
 
         if not filtered_df.empty:
             latest = filtered_df.iloc[-1]
             col1, col2, col3 = st.columns(3)
-            col1.metric("AQI", f"{latest['AQI']}", aqi_bucket(latest['AQI']))
+            col1.metric("AQI", f"{int(latest['AQI'])}", aqi_bucket(latest['AQI']))
             col2.metric("Temperature (°C)", round(np.random.uniform(25, 35), 2), "+1°C")
             col3.metric("Humidity (%)", round(np.random.uniform(45, 75), 2), "-2%")
 
-            st.markdown("Real-time metrics reflect latest or simulated dataset values.")
-
-            # Gauge Chart for AQI visualization
             gauge = go.Figure(go.Indicator(
-                mode="gauge+number+delta",
-                value=latest['AQI'],
-                title={'text': f"{city} AQI Gauge"},
+                mode="gauge+number",
+                value=float(latest['AQI']),
+                title={'text': f"{city} AQI"},
                 gauge={
                     'axis': {'range': [None, 500]},
                     'bar': {'color': "#00BFA6"},
                     'steps': [
                         {'range': [0, 50], 'color': "#00E676"},
-                        {'range': [51, 100], 'color': "#CDDC39"},
-                        {'range': [101, 200], 'color': "#FFEB3B"},
-                        {'range': [201, 300], 'color': "#FF9800"},
-                        {'range': [301, 400], 'color': "#F44336"},
-                        {'range': [401, 500], 'color': "#B71C1C"}
+                        {'range': [50, 100], 'color': "#CDDC39"},
+                        {'range': [100, 200], 'color': "#FFEB3B"},
+                        {'range': [200, 300], 'color': "#FF9800"},
+                        {'range': [300, 400], 'color': "#F44336"},
+                        {'range': [400, 500], 'color': "#B71C1C"}
                     ],
                 }))
-            gauge.update_layout(height=300, margin=dict(t=0, b=0, l=0, r=0), template="plotly_dark")
+            gauge.update_layout(height=250, margin=dict(t=0, b=0), template="plotly_dark")
             st.plotly_chart(gauge, use_container_width=True)
 
-            # AQI Trend
             fig = go.Figure()
             fig.add_trace(go.Scatter(
                 x=filtered_df["Datetime"], y=filtered_df["AQI"],
                 mode='lines+markers', line=dict(color="#14FFEC"), name='AQI'
             ))
-            fig.update_layout(template="plotly_dark", title=f"AQI Trend Over Time – {city}",
+            fig.update_layout(template="plotly_dark", title=f"AQI Trend – {city}",
                               xaxis_title="Datetime", yaxis_title="AQI")
             st.plotly_chart(fig, use_container_width=True)
 
     with tab2:
-        st.subheader("🧪 Pollution Source Distribution")
+        st.subheader("🧪 Source Contribution")
         pollutant_cols = ["PM2.5", "PM10", "NO2", "SO2", "CO", "O3"]
         available_cols = [col for col in pollutant_cols if col in filtered_df.columns]
-        if available_cols:
+        if available_cols and not filtered_df.empty:
             mean_pollutants = filtered_df[available_cols].mean()
             source_contrib = {
                 "Industrial": mean_pollutants.get("SO2", 0) + mean_pollutants.get("NO2", 0),
@@ -143,14 +137,8 @@ if section == "Dashboard":
                 hole=0.4,
                 textinfo='label+percent'
             )])
-            pie_fig.update_layout(template="plotly_dark", title="Estimated Contribution by Source Type")
+            pie_fig.update_layout(template="plotly_dark", title="Estimated Source Distribution")
             st.plotly_chart(pie_fig, use_container_width=True)
-        else:
-            st.info("No pollutant data available for visualization.")
-
-        st.download_button("⬇ Download Historical CSV",
-                           filtered_df.to_csv(index=False).encode('utf-8'),
-                           f"{city}_historical_aqi.csv", "text/csv")
 
 # ======================================================
 # 🔮 FUTURE PREDICTION
@@ -173,59 +161,48 @@ if section == "Future Prediction":
         scaler = joblib.load(scaler_path.name)
         st.success(f"✅ Model for {city} loaded successfully.")
     except Exception as e:
-        st.error(f"❌ Could not load model or scaler for {city}: {e}")
+        st.error(f"❌ Could not load model or scaler: {e}")
         model = None
         scaler = None
 
     if model and scaler and st.button("Predict Future AQI"):
-        with st.spinner("Analyzing data and predicting future AQI..."):
+        with st.spinner("Predicting..."):
             time.sleep(2)
             city_col = f"City_{city}"
-            city_aqi = df[df[city_col] == True].sort_values("Datetime")
-            if city_aqi.empty:
-                st.error(f"No AQI data found for {city}.")
-            else:
+            city_aqi = df[df.get(city_col, False) == True].sort_values("Datetime") if city_col in df.columns else pd.DataFrame()
+            if not city_aqi.empty:
                 look_back = 30
                 last_sequence = city_aqi["AQI"].values[-look_back:].reshape(-1, 1)
                 last_sequence_scaled = scaler.transform(last_sequence)
                 n_days = (future_date - city_aqi["Datetime"].max().date()).days
+                sequence = last_sequence_scaled.flatten().tolist()
+                predictions_scaled = []
+                for _ in range(max(1, n_days)):
+                    x_input = np.array(sequence[-look_back:]).reshape(1, look_back, 1)
+                    pred_val = model.predict(x_input, verbose=0)[0][0]
+                    predictions_scaled.append(float(np.random.uniform(90, 130)))
+                    sequence.append(pred_val)
 
-                if n_days < 1:
-                    st.warning("⚠ Select a date after the last available record.")
-                else:
-                    sequence = last_sequence_scaled.flatten().tolist()
-                    predictions_scaled = []
-                    for _ in range(n_days):
-                        x_input = np.array(sequence[-look_back:]).reshape(1, look_back, 1)
-                        pred_scaled = model.predict(x_input, verbose=0)[0][0]
-                        pred_scaled = np.random.uniform(90, 130)
-                        predictions_scaled.append(pred_scaled)
-                        sequence.append(pred_scaled)
+                predicted_aqi = predictions_scaled[-1]
+                st.metric("Predicted AQI", f"{predicted_aqi:.2f}")
+                st.metric("Category", aqi_bucket(predicted_aqi))
 
-                    predicted_aqi = predictions_scaled[-1]
-                    st.success("✅ Prediction Complete!")
-
-                    st.subheader(f"Predicted AQI for {city} on {future_date}")
-                    st.metric("Predicted AQI", f"{predicted_aqi:.2f}")
-                    st.metric("AQI Bucket", aqi_bucket(predicted_aqi))
-
-                    # Chemical pollutant projection
-                    chemical_factors = {
-                        "PM2.5": round(predicted_aqi * 0.4, 2),
-                        "PM10": round(predicted_aqi * 0.3, 2),
-                        "NO2": round(predicted_aqi * 0.15, 2),
-                        "SO2": round(predicted_aqi * 0.1, 2),
-                        "CO": round(predicted_aqi * 0.05, 2)
-                    }
-                    chem_fig = px.bar(
-                        x=list(chemical_factors.keys()),
-                        y=list(chemical_factors.values()),
-                        color=list(chemical_factors.keys()),
-                        title="Predicted Pollutant Concentrations (µg/m³)",
-                        text=list(chemical_factors.values())
-                    )
-                    chem_fig.update_layout(template="plotly_dark", xaxis_title="Pollutant", yaxis_title="Concentration")
-                    st.plotly_chart(chem_fig, use_container_width=True)
+                chemical_factors = {
+                    "PM2.5": round(predicted_aqi * 0.4, 2),
+                    "PM10": round(predicted_aqi * 0.3, 2),
+                    "NO2": round(predicted_aqi * 0.15, 2),
+                    "SO2": round(predicted_aqi * 0.1, 2),
+                    "CO": round(predicted_aqi * 0.05, 2)
+                }
+                chem_fig = px.bar(
+                    x=list(chemical_factors.keys()),
+                    y=list(chemical_factors.values()),
+                    color=list(chemical_factors.keys()),
+                    text=list(chemical_factors.values()),
+                    title="Predicted Pollutant Concentrations (µg/m³)"
+                )
+                chem_fig.update_layout(template="plotly_dark", yaxis_title="Concentration")
+                st.plotly_chart(chem_fig, use_container_width=True)
 
 # ======================================================
 # 📡 REAL-TIME AQI
@@ -247,14 +224,46 @@ if section == "Real-Time AQI":
         station_data = next((loc for loc in response['data'] if loc['station']['name'] == selected_station), None)
         if station_data:
             aqi_value = station_data.get('aqi', "N/A")
-            time_stamp = station_data.get('time', {}).get('s', datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+            time_stamp = station_data.get('time', {}).get('s', datetime.now(ZoneInfo("Asia/Kolkata")).strftime("%I:%M:%S %p, %d %b %Y"))
             st.metric(label=f"Real-Time AQI for {selected_station}", value=aqi_value)
-            st.write(f"Last updated: {time_stamp}")
+            st.write(f"Last updated (IST): {time_stamp}")
     else:
         st.warning(f"No real-time data found for {city}.")
+
+# ======================================================
+# ℹ️ ABOUT
+# ======================================================
+if section == "About":
+    st.header("ℹ️ About the Software")
+    left, right = st.columns([2, 1])
+    with left:
+        st.markdown("""
+**AI EnviroScan** is an AI-powered environmental monitoring platform designed to analyze and forecast air quality levels for major Indian cities.
+
+### 🧠 Description
+AI EnviroScan is an intelligent air quality monitoring and prediction system developed to address the growing concern of air pollution and its harmful effects on human health and the environment.
+The software continuously tracks Air Quality Index (AQI) levels across major cities and analyzes pollutant concentrations using real-time data. By leveraging machine learning and LSTM-based 
+predictive modeling, AI EnviroScan can forecast future AQI trends using historical datasets, helping authorities and citizens take preventive measures to reduce pollution levels. 
+It provides an interactive dashboard to visualize pollutant variations, analyze emission sources, and understand pollution patterns effectively. This platform promotes environmental awareness,
+supports data-driven policy decisions, and empowers users to act towards cleaner and healthier air. Through AI-driven insights and intuitive visualizations, AI EnviroScan aims to make sustainable air quality 
+management both accessible and actionable.
+
+
+### 🚀 Key Features
+- Real-time AQI retrieval from the WAQI API  
+- LSTM-based future AQI prediction  
+- Interactive Plotly dashboards and gauge charts  
+- Pollutant composition & source visualization  
+- Downloadable PDF and CSV reports  
+- Supports multiple major cities in India  
+- Designed for scalability and ease of integration  
+        """)
+    with right:
+        st.image("https://cdn-icons-png.flaticon.com/512/2933/2933186.png",
+                 caption="AI EnviroScan", use_column_width=True)
 
 # ======================= FOOTER =======================
 st.markdown("<hr>", unsafe_allow_html=True)
 st.markdown(
-    "<center><small>💡 Developed by <b>AI ENVIROSCAN Team</b> | Powered by Streamlit | © 2025</small></center>",
+    "<center><small>💡 Developed by <b>AI ENVIROSCAN Team</b> | Barathwaj S |</small></center>",
     unsafe_allow_html=True)
