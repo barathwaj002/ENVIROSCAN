@@ -120,40 +120,40 @@ if section == "Dashboard":
             st.plotly_chart(fig, use_container_width=True)
 
     with tab2:
-    st.subheader("🧪 Source Contribution")
-    pollutant_cols = ["PM2.5", "PM10", "NO2", "SO2", "CO", "O3"]
-    available = [c for c in pollutant_cols if c in filtered_df.columns]
+          st.subheader("🧪 Source Contribution")
+          pollutant_cols = ["PM2.5", "PM10", "NO2", "SO2", "CO", "O3"]
+          available = [c for c in pollutant_cols if c in filtered_df.columns]
 
-    if available and not filtered_df.empty:
-        mean_vals = filtered_df[available].mean()
+          if available and not filtered_df.empty:
+                 mean_vals = filtered_df[available].mean()
 
-        # Map pollutants to source categories
-        industrial = mean_vals.get("SO2", 0) + mean_vals.get("NO2", 0)
-        vehicular = mean_vals.get("CO", 0) + mean_vals.get("O3", 0)
-        agricultural = mean_vals.get("PM10", 0) * 0.6
-        others = mean_vals.get("PM2.5", 0) * 0.4
+                 # Map pollutants to source categories
+                 industrial = mean_vals.get("SO2", 0) + mean_vals.get("NO2", 0)
+                 vehicular = mean_vals.get("CO", 0) + mean_vals.get("O3", 0)
+                 agricultural = mean_vals.get("PM10", 0) * 0.6
+                 others = mean_vals.get("PM2.5", 0) * 0.4
 
-        total = industrial + vehicular + agricultural + others
-        if total == 0: total = 1  # prevent division by zero
+                total = industrial + vehicular + agricultural + others
+                if total == 0: total = 1  # prevent division by zero
 
-        source_contrib = {
-            "Industrial": round((industrial / total) * 100, 2),
-            "Vehicular": round((vehicular / total) * 100, 2),
-            "Agricultural": round((agricultural / total) * 100, 2),
-            "Others": round((others / total) * 100, 2)
-        }
+                        source_contrib = {
+                        "Industrial": round((industrial / total) * 100, 2),
+                        "Vehicular": round((vehicular / total) * 100, 2),
+                        "Agricultural": round((agricultural / total) * 100, 2),
+                        "Others": round((others / total) * 100, 2)
+                        }
 
-        pie_fig = go.Figure(go.Pie(
-            labels=list(source_contrib.keys()),
-            values=list(source_contrib.values()),
-            hole=0.4,
-            textinfo="label+percent",
-            marker=dict(colors=["#FF6F61", "#6B5B95", "#88B04B", "#FFA500"])
-        ))
-        pie_fig.update_layout(template="plotly_dark", title="Source Contribution (%)")
-        st.plotly_chart(pie_fig, use_container_width=True)
-    else:
-        st.info("No pollutant data for this city.")
+                         pie_fig = go.Figure(go.Pie(
+                         labels=list(source_contrib.keys()),
+                         values=list(source_contrib.values()),
+                         hole=0.4,
+                         textinfo="label+percent",
+                         marker=dict(colors=["#FF6F61", "#6B5B95", "#88B04B", "#FFA500"])
+                         ))  
+                         pie_fig.update_layout(template="plotly_dark", title="Source Contribution (%)")
+                         st.plotly_chart(pie_fig, use_container_width=True)
+          else:
+               st.info("No pollutant data for this city.")
 
 # ======================================================
 # 🔮 FUTURE PREDICTION
