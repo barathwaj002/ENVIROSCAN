@@ -292,5 +292,5 @@ management both accessible and actionable.
 # ======================= FOOTER =======================
 st.markdown("<hr>", unsafe_allow_html=True)
 st.markdown(
-    "<center><small>💡 Developed by <b>AI ENVIROSCAN Team</b> |<b>Barathwaj S</b></small></center>",
+    "<center><small>💡 Developed by <b>AI ENVIROSCAN Team</b> |<b> Barathwaj S 😊</b></small></center>",
     unsafe_allow_html=True)
