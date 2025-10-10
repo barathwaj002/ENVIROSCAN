@@ -70,15 +70,15 @@ ist_formatted = ist_now.strftime("%I:%M:%S %p, %d %b %Y")
 # 🌍 Earth/Globe icon
 st.sidebar.image("https://cdn-icons-png.flaticon.com/512/727/727790.png", width=90)
 st.sidebar.title("🌿 Navigation")
-section = st.sidebar.radio("Select Section", ["Dashboard", "Future Prediction", "Real-Time AQI", "About"])
+section = st.sidebar.radio("Select Section", ["Historical AQI Values", "Future Prediction", "Real-Time AQI", "About"])
 city = st.sidebar.selectbox("Select City", ["Bangalore", "Chennai", "Delhi", "Kolkata", "Mumbai"])
 st.sidebar.markdown(f"⏰ **IST Time:** {ist_formatted} (Asia/Kolkata)")
 st.sidebar.markdown("---")
 
 # ======================================================
-# 📊 DASHBOARD
+# 📊 HISTORICAL AQI VALUE 
 # ======================================================
-if section == "Dashboard":
+if section == "Historical AQI Values":
     tab1, tab2 = st.tabs(["📈 Overview", "🧪 Pollutants & Sources"])
     with tab1:
         st.subheader(f"📊 Current Metrics for {city}")
@@ -286,10 +286,7 @@ management both accessible and actionable.
     with right:
         st.image(
             "https://images.openai.com/static-rsc-1/uqsYT8jB8poDYiGYi61ODXXwbhEBYLk-BgWvdkJVR3yMiGpdGOxYGPTz-oFYgPWtC1hUDn8VAX--JkCWZdhsBQppKvdpwfFJrv1QzRREIG8hmzQ4Y93InWMB9SJ6AFbkTzMceil1-r1yoCVmGmWvHA",
-            caption="AI EnviroScan",
-            use_column_width=False,
-            width=250,
-            output_format="auto"
+            use_container_width=True
         )
 
 # ======================= FOOTER =======================
