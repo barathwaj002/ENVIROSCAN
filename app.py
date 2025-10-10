@@ -67,7 +67,7 @@ if df.empty:
 ist_now = datetime.now(ZoneInfo("Asia/Kolkata"))
 ist_formatted = ist_now.strftime("%I:%M:%S %p, %d %b %Y")
 
-st.sidebar.image("https://cdn-icons-png.flaticon.com/512/727/727790.png", width=90)
+st.sidebar.image("https://cdn-icons-png.flaticon.com/512/69/69524.png", width=90)
 st.sidebar.title("🌿 Navigation")
 section = st.sidebar.radio("Select Section", ["Dashboard", "Future Prediction", "Real-Time AQI", "About"])
 city = st.sidebar.selectbox("Select City", ["Bangalore", "Chennai", "Delhi", "Kolkata", "Mumbai"])
@@ -85,39 +85,50 @@ if section == "Dashboard":
         filtered_df = df[df.get(city_column, False) == True].sort_values("Datetime") if city_column in df.columns else pd.DataFrame()
 
         if not filtered_df.empty:
-            latest = filtered_df.iloc[-1]
-            col1, col2, col3 = st.columns(3)
-            col1.metric("AQI", f"{int(latest['AQI'])}", aqi_bucket(latest['AQI']))
-            col2.metric("Temperature (°C)", round(np.random.uniform(25, 35), 2), "+1°C")
-            col3.metric("Humidity (%)", round(np.random.uniform(45, 75), 2), "-2%")
+            # ===== USER-SELECTED DATE RANGE =====
+            min_date = filtered_df["Datetime"].min().date()
+            max_date = filtered_df["Datetime"].max().date()
+            start_date, end_date = st.date_input("Select Date Range", [min_date, max_date], key="date_range")
 
-            gauge = go.Figure(go.Indicator(
-                mode="gauge+number",
-                value=float(latest['AQI']),
-                title={'text': f"{city} AQI"},
-                gauge={
-                    'axis': {'range': [None, 500]},
-                    'bar': {'color': "#00BFA6"},
-                    'steps': [
-                        {'range': [0, 50], 'color': "#00E676"},
-                        {'range': [50, 100], 'color': "#CDDC39"},
-                        {'range': [100, 200], 'color': "#FFEB3B"},
-                        {'range': [200, 300], 'color': "#FF9800"},
-                        {'range': [300, 400], 'color': "#F44336"},
-                        {'range': [400, 500], 'color': "#B71C1C"}
-                    ],
-                }))
-            gauge.update_layout(height=250, margin=dict(t=0, b=0), template="plotly_dark")
-            st.plotly_chart(gauge, use_container_width=True)
+            filtered_df = filtered_df[(filtered_df["Datetime"].dt.date >= start_date) &
+                                      (filtered_df["Datetime"].dt.date <= end_date)]
 
-            fig = go.Figure()
-            fig.add_trace(go.Scatter(
-                x=filtered_df["Datetime"], y=filtered_df["AQI"],
-                mode='lines+markers', line=dict(color="#14FFEC"), name='AQI'
-            ))
-            fig.update_layout(template="plotly_dark", title=f"AQI Trend – {city}",
-                              xaxis_title="Datetime", yaxis_title="AQI")
-            st.plotly_chart(fig, use_container_width=True)
+            if filtered_df.empty:
+                st.warning("No data available for the selected date range.")
+            else:
+                latest = filtered_df.iloc[-1]
+                col1, col2, col3 = st.columns(3)
+                col1.metric("AQI", f"{int(latest['AQI'])}", aqi_bucket(latest['AQI']))
+                col2.metric("Temperature (°C)", round(np.random.uniform(25, 35), 2), "+1°C")
+                col3.metric("Humidity (%)", round(np.random.uniform(45, 75), 2), "-2%")
+
+                gauge = go.Figure(go.Indicator(
+                    mode="gauge+number",
+                    value=float(latest['AQI']),
+                    title={'text': f"{city} AQI"},
+                    gauge={
+                        'axis': {'range': [None, 500]},
+                        'bar': {'color': "#00BFA6"},
+                        'steps': [
+                            {'range': [0, 50], 'color': "#00E676"},
+                            {'range': [50, 100], 'color': "#CDDC39"},
+                            {'range': [100, 200], 'color': "#FFEB3B"},
+                            {'range': [200, 300], 'color': "#FF9800"},
+                            {'range': [300, 400], 'color': "#F44336"},
+                            {'range': [400, 500], 'color': "#B71C1C"}
+                        ],
+                    }))
+                gauge.update_layout(height=250, margin=dict(t=0, b=0), template="plotly_dark")
+                st.plotly_chart(gauge, use_container_width=True)
+
+                fig = go.Figure()
+                fig.add_trace(go.Scatter(
+                    x=filtered_df["Datetime"], y=filtered_df["AQI"],
+                    mode='lines+markers', line=dict(color="#14FFEC"), name='AQI'
+                ))
+                fig.update_layout(template="plotly_dark", title=f"AQI Trend – {city}",
+                                  xaxis_title="Datetime", yaxis_title="AQI")
+                st.plotly_chart(fig, use_container_width=True)
 
     with tab2:
         st.subheader("🧪 Source Contribution")
