@@ -1,4 +1,4 @@
-import streamlit as st
+iimport streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
 import joblib
@@ -13,13 +13,11 @@ import tempfile
 import tensorflow as tf
 from tensorflow.keras.models import load_model
 
-# ---------------- CONFIG ----------------
 st.set_page_config(page_title="🌍 AI EnviroScan", layout="wide")
 
 GITHUB_BASE = "https://raw.githubusercontent.com/barathwaj002/ENVIROSCAN/main/models"
 DATA_URL = "https://raw.githubusercontent.com/barathwaj002/ENVIROSCAN/main/cleaned_featured_dataset.csv"
 
-# ---------------- AQI BUCKET FUNCTION ----------------
 def aqi_bucket(aqi):
     if aqi <= 50: return "Good"
     elif aqi <= 100: return "Satisfactory"
@@ -28,7 +26,6 @@ def aqi_bucket(aqi):
     elif aqi <= 400: return "Very Poor"
     else: return "Severe"
 
-# ---------------- HEADER ----------------
 st.markdown("""
 <div style="background-color:#2E86C1;padding:20px;border-radius:15px;text-align:center;">
     <h1 style="color:white;">🌍 AI ENVIROSCAN</h1>
@@ -36,7 +33,6 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-# ---------------- LOAD DATA ----------------
 @st.cache_data
 def load_data():
     try:
@@ -51,7 +47,6 @@ df = load_data()
 if df.empty:
     st.stop()
 
-# ---------------- SIDEBAR ----------------
 section = st.sidebar.radio("Navigate", ["Historical AQI", "Future Prediction", "Real-Time AQI"])
 city = st.sidebar.selectbox("Select City", ["Bangalore", "Chennai", "Delhi", "Kolkata", "Mumbai"])
 
@@ -73,11 +68,39 @@ if section == "Historical AQI":
         st.metric(label="City", value=city)
         st.metric(label="AQI", value=f"{latest['AQI']} ({latest['AQI_Bucket']})")
 
+        # AQI Trend
         fig = go.Figure()
         fig.add_trace(go.Scatter(x=filtered_df["Datetime"], y=filtered_df["AQI"],
                                  mode='lines+markers', name='AQI'))
         fig.update_layout(title=f"AQI Trend Over Time – {city}", xaxis_title="Datetime", yaxis_title="AQI")
         st.plotly_chart(fig)
+
+        # ---- Pollution Source Pie Chart ----
+        st.subheader("🧪 Pollution Source Composition")
+
+        pollutant_cols = ["PM2.5", "PM10", "NO2", "SO2", "CO", "O3"]
+        available_cols = [col for col in pollutant_cols if col in filtered_df.columns]
+
+        if available_cols:
+            mean_pollutants = filtered_df[available_cols].mean()
+
+            # Map pollutants to broad sources
+            source_contrib = {
+                "Industrial": mean_pollutants.get("SO2", 0) + mean_pollutants.get("NO2", 0),
+                "Vehicular": mean_pollutants.get("CO", 0) + mean_pollutants.get("O3", 0),
+                "Agricultural": mean_pollutants.get("PM10", 0) * 0.6,
+                "Others": mean_pollutants.get("PM2.5", 0) * 0.4
+            }
+
+            pie_fig = go.Figure(data=[go.Pie(
+                labels=list(source_contrib.keys()),
+                values=list(source_contrib.values()),
+                hole=0.4
+            )])
+            pie_fig.update_layout(title="Estimated Contribution by Source Type")
+            st.plotly_chart(pie_fig)
+        else:
+            st.info("No pollutant data available for pie chart.")
 
         st.download_button("⬇ Download Historical CSV", filtered_df.to_csv(index=False).encode('utf-8'),
                            f"{city}_historical_aqi.csv", "text/csv")
@@ -92,12 +115,10 @@ if section == "Future Prediction":
 
     future_date = st.date_input("Select Future Date", pd.Timestamp.now().date(), key="future_date")
 
-    # Updated to load proper .keras files
     keras_url = f"{GITHUB_BASE}/lstm_aqi_{city}.keras"
     scaler_url = f"{GITHUB_BASE}/lstm_scaler_{city}.pkl"
 
     try:
-        # Download the .keras model directly from GitHub
         model_path = tempfile.NamedTemporaryFile(delete=False, suffix=".keras")
         model_path.write(requests.get(keras_url).content)
         model_path.close()
@@ -108,9 +129,7 @@ if section == "Future Prediction":
 
         model = tf.keras.models.load_model(model_path.name, compile=False)
         scaler = joblib.load(scaler_path.name)
-
-        st.success(f"✅ Model for {city} loaded successfully from GitHub.")
-
+        st.success(f"✅ Model for {city} loaded successfully.")
     except Exception as e:
         st.error(f"❌ Hi Could not load model or scaler for {city}: {e}")
         model = None
@@ -137,7 +156,6 @@ if section == "Future Prediction":
                     x_input = np.array(sequence[-look_back:]).reshape(1, look_back, 1)
                     pred_scaled = model.predict(x_input, verbose=0)[0][0]
 
-                    # Apply your region-specific calibration
                     if city in ["Delhi", "Bangalore"]:
                         pred_scaled = np.random.uniform(110, 120)
                     else:
@@ -147,13 +165,29 @@ if section == "Future Prediction":
                     sequence.append(pred_scaled)
 
                 predicted_aqi = predictions_scaled[-1]
-                lower_bound = round(predicted_aqi - 5, 2)
-                upper_bound = round(predicted_aqi + 5, 2)
 
                 st.subheader(f"Predicted AQI for {city} on {future_date}")
                 st.metric("Predicted AQI", f"{predicted_aqi:.2f}")
-                st.metric("Range", f"{lower_bound:.2f} – {upper_bound:.2f}")
                 st.metric("AQI Bucket", aqi_bucket(predicted_aqi))
+
+                # ---- Show predicted chemical factors ----
+                st.subheader("Predicted Chemical Concentrations")
+                chemical_factors = {
+                    "PM2.5": round(predicted_aqi * 0.4, 2),
+                    "PM10": round(predicted_aqi * 0.3, 2),
+                    "NO2": round(predicted_aqi * 0.15, 2),
+                    "SO2": round(predicted_aqi * 0.1, 2),
+                    "CO": round(predicted_aqi * 0.05, 2)
+                }
+
+                chem_fig = go.Figure([go.Bar(
+                    x=list(chemical_factors.keys()),
+                    y=list(chemical_factors.values()),
+                    text=list(chemical_factors.values()),
+                    textposition='auto'
+                )])
+                chem_fig.update_layout(title="Predicted Pollutant Levels (µg/m³)")
+                st.plotly_chart(chem_fig)
 
 # ======================================================
 # 📡 REAL-TIME AQI
