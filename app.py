@@ -121,24 +121,30 @@ if section == "Dashboard":
 
     with tab2:
         st.subheader("🧪 Source Contribution")
-        pollutant_cols = ["PM2.5", "PM10", "NO2", "SO2", "CO", "O3"]
-        available_cols = [col for col in pollutant_cols if col in filtered_df.columns]
-        if available_cols and not filtered_df.empty:
-            mean_pollutants = filtered_df[available_cols].mean()
-            source_contrib = {
-                "Industrial": mean_pollutants.get("SO2", 0) + mean_pollutants.get("NO2", 0),
-                "Vehicular": mean_pollutants.get("CO", 0) + mean_pollutants.get("O3", 0),
-                "Agricultural": mean_pollutants.get("PM10", 0) * 0.6,
-                "Others": mean_pollutants.get("PM2.5", 0) * 0.4
-            }
-            pie_fig = go.Figure(data=[go.Pie(
-                labels=list(source_contrib.keys()),
-                values=list(source_contrib.values()),
-                hole=0.4,
-                textinfo='label+percent'
-            )])
-            pie_fig.update_layout(template="plotly_dark", title="Estimated Source Distribution")
-            st.plotly_chart(pie_fig, use_container_width=True)
+       # inside your Dashboard or wherever you draw the pie chart
+       pollutant_cols = ["PM2.5", "PM10", "NO2", "SO2", "CO", "O3"]
+       # filtered_df is the city’s data
+       available = [c for c in pollutant_cols if c in filtered_df.columns]
+       if available and not filtered_df.empty:
+           # compute mean or sum or latest pollutant values
+           mean_vals = filtered_df[available].mean()
+           # dynamically map sources
+           source_contrib = {}
+           source_contrib["Industrial"] = mean_vals.get("SO2", 0) + mean_vals.get("NO2", 0)
+           source_contrib["Vehicular"] = mean_vals.get("CO", 0) + mean_vals.get("O3", 0)
+           source_contrib["Agricultural"] = mean_vals.get("PM10", 0) * 0.6  # example weight
+           source_contrib["Others"] = mean_vals.get("PM2.5", 0) * 0.4
+
+           pie_fig = go.Figure(go.Pie(
+           labels=list(source_contrib.keys()),
+           values=list(source_contrib.values()),
+           hole=0.4,
+           textinfo="label+percent"
+            ))
+           pie_fig.update_layout(template="plotly_dark", title="Source Contribution (%)")
+           st.plotly_chart(pie_fig, use_container_width=True)
+       else:
+           st.info("No pollutant data for this city.")
 
 # ======================================================
 # 🔮 FUTURE PREDICTION
@@ -238,7 +244,7 @@ if section == "About":
     left, right = st.columns([2, 1])
     with left:
         st.markdown("""
-**AI EnviroScan** is an AI-powered environmental monitoring platform designed to analyze and forecast air quality levels for major Indian cities.
+**AI EnviroScan** an AI-powered environmental monitoring platform designed to analyze and forecast air quality levels for major Indian cities.
 
 ### 🧠 Description
 AI EnviroScan is an intelligent air quality monitoring and prediction system developed to address the growing concern of air pollution and its harmful effects on human health and the environment.
@@ -247,7 +253,6 @@ predictive modeling, AI EnviroScan can forecast future AQI trends using historic
 It provides an interactive dashboard to visualize pollutant variations, analyze emission sources, and understand pollution patterns effectively. This platform promotes environmental awareness,
 supports data-driven policy decisions, and empowers users to act towards cleaner and healthier air. Through AI-driven insights and intuitive visualizations, AI EnviroScan aims to make sustainable air quality 
 management both accessible and actionable.
-
 
 ### 🚀 Key Features
 - Real-time AQI retrieval from the WAQI API  
@@ -259,11 +264,14 @@ management both accessible and actionable.
 - Designed for scalability and ease of integration  
         """)
     with right:
-        st.image("https://cdn-icons-png.flaticon.com/512/2933/2933186.png",
-                 caption="AI EnviroScan", use_column_width=True)
+        st.image(
+            "https://images.openai.com/static-rsc-1/uqsYT8jB8poDYiGYi61ODXXwbhEBYLk-BgWvdkJVR3yMiGpdGOxYGPTz-oFYgPWtC1hUDn8VAX--JkCWZdhsBQppKvdpwfFJrv1QzRREIG8hmzQ4Y93InWMB9SJ6AFbkTzMceil1-r1yoCVmGmWvHA",
+            caption="AI EnviroScan",
+            use_container_width=True
+        )
 
 # ======================= FOOTER =======================
 st.markdown("<hr>", unsafe_allow_html=True)
 st.markdown(
-    "<center><small>💡 Developed by <b>AI ENVIROSCAN Team</b> | Barathwaj S |</small></center>",
+    "<center><small>💡 Developed by <b>AI ENVIROSCAN Team</b> |</b> Barathwaj S </b>|</small></center>",
     unsafe_allow_html=True)
